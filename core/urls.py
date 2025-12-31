@@ -8,13 +8,14 @@ urlpatterns = [
     path('pos/clear/', views.pos_clear, name='pos_clear'),
     path('pos/checkout/', views.pos_checkout, name='pos_checkout'),
 
-    # Online Store placeholders
-    path('store/', views.product_list, name='product_list'),
-    path('store/product/<int:pk>/', views.product_detail, name='product_detail'),
-    path('store/add/<int:pk>/', views.add_to_cart, name='add_to_cart'),
-    path('store/cart/', views.cart_view, name='cart_view'),
-    path('store/cart/remove/<str:product_id>/', views.remove_from_cart, name='remove_from_cart'),
-    path('store/checkout/', views.checkout, name='checkout'),
+    # Management
+    path('manage/login/', views.manager_login, name='manager_login'),
+    path('manage/', views.manage_dashboard, name='manage_dashboard'),
+    path('manage/add/', views.add_product, name='add_product'),
+    path('manage/remove/', views.remove_product, name='remove_product'),
+    path('manage/remove/<int:pk>/', views.remove_product_action, name='remove_product_action'),
+    path('manage/stock/', views.add_stock, name='add_stock'),
+    path('manage/stock/<int:pk>/', views.add_stock_action, name='add_stock_action'),
 
     # Reports
     path('reports/', views.report_view, name='report_view'),

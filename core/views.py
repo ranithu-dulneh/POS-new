@@ -3,10 +3,20 @@ from django.contrib import messages
 from django.db import transaction
 from django.db.models import Sum
 from .models import Product, Order, OrderItem
-from .forms import POSForm
+from .forms import POSForm, ManagerLoginForm, ProductForm, AddStockForm
 from decimal import Decimal
 from datetime import timedelta
 from django.utils import timezone
+from functools import wraps
+
+# Decorator to check manager auth
+def manager_required(view_func):
+    @wraps(view_func)
+    def _wrapped_view(request, *args, **kwargs):
+        if not request.session.get('is_manager'):
+            return redirect('manager_login')
+        return view_func(request, *args, **kwargs)
+    return _wrapped_view
 
 # Helper to get cart from session
 def get_cart(request):
@@ -14,14 +24,6 @@ def get_cart(request):
 
 def save_cart(request, cart):
     request.session['pos_cart'] = cart
-    request.session.modified = True
-
-# Online Cart Helpers
-def get_online_cart(request):
-    return request.session.get('online_cart', {})
-
-def save_online_cart(request, cart):
-    request.session['online_cart'] = cart
     request.session.modified = True
 
 def pos_view(request):
@@ -149,132 +151,80 @@ def pos_checkout(request):
 
     return redirect('pos_view')
 
-def product_list(request):
-    products = Product.objects.all()
-    return render(request, 'core/product_list.html', {'products': products})
-
-def product_detail(request, pk):
-    product = get_object_or_404(Product, pk=pk)
-    return render(request, 'core/product_detail.html', {'product': product})
-
-def add_to_cart(request, pk):
-    product = get_object_or_404(Product, pk=pk)
+def manager_login(request):
     if request.method == 'POST':
-        cart = get_online_cart(request)
-        product_id = str(product.id)
-
-        if product.stock_quantity > 0:
-            if product_id in cart:
-                cart[product_id]['quantity'] += 1
+        form = ManagerLoginForm(request.POST)
+        if form.is_valid():
+            if form.cleaned_data['code'] == '123123':
+                request.session['is_manager'] = True
+                return redirect('manage_dashboard')
             else:
-                cart[product_id] = {
-                    'name': product.name,
-                    'price': str(product.price),
-                    'quantity': 1
-                }
-            save_online_cart(request, cart)
-            messages.success(request, f"Added {product.name} to cart.")
-        else:
-            messages.error(request, "Out of stock.")
+                messages.error(request, "Invalid Code")
+    else:
+        form = ManagerLoginForm()
+    return render(request, 'core/manager_login.html', {'form': form})
 
-    return redirect('product_list') # Or detail page
+@manager_required
+def manage_dashboard(request):
+    return render(request, 'core/manage_dashboard.html')
 
-def cart_view(request):
-    cart = get_online_cart(request)
-    cart_items = []
-    total_amount = Decimal('0.00')
-
-    for product_id, item in cart.items():
-        subtotal = Decimal(str(item['price'])) * item['quantity']
-        total_amount += subtotal
-        cart_items.append({
-            'product_id': product_id,
-            'name': item['name'],
-            'price': Decimal(str(item['price'])),
-            'quantity': item['quantity'],
-            'subtotal': subtotal
-        })
-
-    return render(request, 'core/cart.html', {
-        'cart_items': cart_items,
-        'total_amount': total_amount
-    })
-
-def remove_from_cart(request, product_id):
-    cart = get_online_cart(request)
-    if product_id in cart:
-        del cart[product_id]
-        save_online_cart(request, cart)
-        messages.success(request, "Item removed from cart.")
-    return redirect('cart_view')
-
-@transaction.atomic
-def checkout(request):
+@manager_required
+def add_product(request):
     if request.method == 'POST':
-        cart = get_online_cart(request)
-        if not cart:
-            messages.error(request, "Cart is empty.")
-            return redirect('cart_view')
+        form = ProductForm(request.POST, request.FILES)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Product Added Successfully")
+            return redirect('manage_dashboard')
+    else:
+        form = ProductForm()
+    return render(request, 'core/add_product.html', {'form': form})
 
-        total_amount = Decimal('0.00')
-        order_items = []
+@manager_required
+def remove_product(request):
+    products = Product.objects.all()
+    return render(request, 'core/remove_product.html', {'products': products})
 
-        for product_id, item in cart.items():
-            product = get_object_or_404(Product, id=product_id)
-            quantity = item['quantity']
+@manager_required
+def remove_product_action(request, pk):
+    product = get_object_or_404(Product, pk=pk)
+    product.delete()
+    messages.success(request, f"Deleted {product.name}")
+    return redirect('remove_product')
 
-            if product.stock_quantity < quantity:
-                messages.error(request, f"Not enough stock for {product.name}. Available: {product.stock_quantity}")
-                return redirect('cart_view')
+@manager_required
+def add_stock(request):
+    products = Product.objects.all()
+    return render(request, 'core/add_stock.html', {'products': products})
 
-            price = Decimal(str(item['price']))
-            total_amount += price * quantity
-            order_items.append((product, quantity, price))
-
-        # Create Order
-        order = Order.objects.create(
-            order_type='ONLINE',
-            total_amount=total_amount
-        )
-
-        for product, quantity, price in order_items:
-            OrderItem.objects.create(
-                order=order,
-                product=product,
-                quantity=quantity,
-                price_at_sale=price
-            )
-            product.stock_quantity -= quantity
+@manager_required
+def add_stock_action(request, pk):
+    product = get_object_or_404(Product, pk=pk)
+    if request.method == 'POST':
+        form = AddStockForm(request.POST)
+        if form.is_valid():
+            quantity = form.cleaned_data['quantity']
+            product.stock_quantity += quantity
             product.save()
-
-        request.session['online_cart'] = {}
-        messages.success(request, f"Order placed successfully! Order ID: {order.id}")
-        return redirect('product_list')
-
-    return redirect('cart_view')
+            messages.success(request, f"Added {quantity} to {product.name}. New total: {product.stock_quantity}")
+    return redirect('add_stock')
 
 def report_view(request):
-    date_filter = request.GET.get('date_filter', 'week')
-    now = timezone.now()
+    # Daily Sales Logic
+    today = timezone.now().date()
+    daily_orders = Order.objects.filter(date_created__date=today)
 
-    if date_filter == 'month':
-        start_date = now - timedelta(days=30)
-    elif date_filter == 'year':
-        start_date = now - timedelta(days=365)
-    else: # week
-        start_date = now - timedelta(days=7)
+    daily_sales = daily_orders.aggregate(Sum('total_amount'))['total_amount__sum'] or Decimal('0.00')
 
-    orders = Order.objects.filter(date_created__gte=start_date).order_by('-date_created')
-
-    total_sales = orders.aggregate(Sum('total_amount'))['total_amount__sum'] or Decimal('0.00')
-    online_sales = orders.filter(order_type='ONLINE').aggregate(Sum('total_amount'))['total_amount__sum'] or Decimal('0.00')
-    pos_sales = orders.filter(order_type='POS').aggregate(Sum('total_amount'))['total_amount__sum'] or Decimal('0.00')
+    # Products sold today
+    sold_items = OrderItem.objects.filter(order__in=daily_orders) \
+        .values('product__name') \
+        .annotate(total_qty=Sum('quantity')) \
+        .order_by('-total_qty')
 
     context = {
-        'orders': orders,
-        'total_sales': total_sales,
-        'online_sales': online_sales,
-        'pos_sales': pos_sales,
-        'date_filter': date_filter
+        'daily_sales': daily_sales,
+        'sold_items': sold_items,
+        'date': today
     }
     return render(request, 'core/reports.html', context)

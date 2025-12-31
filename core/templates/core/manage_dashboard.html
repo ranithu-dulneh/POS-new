@@ -1,0 +1,40 @@
+{% extends 'base.html' %}
+
+{% block title %}Manage Dashboard{% endblock %}
+
+{% block content %}
+<h1 class="mb-4">Product Management</h1>
+
+<div class="row text-center">
+    <div class="col-md-4 mb-4">
+        <a href="{% url 'add_product' %}" class="text-decoration-none">
+            <div class="card h-100 bg-success text-white">
+                <div class="card-body d-flex flex-column justify-content-center align-items-center">
+                    <h2 class="display-4">+</h2>
+                    <h3>Add New Product</h3>
+                </div>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-4 mb-4">
+        <a href="{% url 'remove_product' %}" class="text-decoration-none">
+            <div class="card h-100 bg-danger text-white">
+                <div class="card-body d-flex flex-column justify-content-center align-items-center">
+                    <h2 class="display-4">-</h2>
+                    <h3>Remove Product</h3>
+                </div>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-4 mb-4">
+        <a href="{% url 'add_stock' %}" class="text-decoration-none">
+            <div class="card h-100 bg-info text-white">
+                <div class="card-body d-flex flex-column justify-content-center align-items-center">
+                    <h2 class="display-4">📦</h2>
+                    <h3>Add Stocks</h3>
+                </div>
+            </div>
+        </a>
+    </div>
+</div>
+{% endblock %}

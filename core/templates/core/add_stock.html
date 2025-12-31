@@ -1,0 +1,49 @@
+{% extends 'base.html' %}
+
+{% block title %}Add Stocks{% endblock %}
+
+{% block content %}
+<h2>Add Stocks</h2>
+<div class="mb-3">
+    <a href="{% url 'manage_dashboard' %}" class="btn btn-secondary">Back to Dashboard</a>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-striped align-middle">
+                <thead>
+                    <tr>
+                        <th style="width: 30%">Product</th>
+                        <th style="width: 15%">Present Stock</th>
+                        <th style="width: 55%">Add Purchasing</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for product in products %}
+                    <tr>
+                        <td>{{ product.name }}<br><small class="text-muted">{{ product.barcode }}</small></td>
+                        <td><span class="badge bg-info fs-6">{{ product.stock_quantity }}</span></td>
+                        <td>
+                            <form method="post" action="{% url 'add_stock_action' product.id %}" class="row g-2 align-items-center">
+                                {% csrf_token %}
+                                <div class="col-auto">
+                                    <input type="number" name="quantity" class="form-control" placeholder="Qty" min="1" required>
+                                </div>
+                                <div class="col-auto">
+                                    <button type="submit" class="btn btn-success">Add</button>
+                                </div>
+                            </form>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="3" class="text-center">No products found.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
