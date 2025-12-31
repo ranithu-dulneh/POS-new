@@ -1,0 +1,51 @@
+{% extends 'base.html' %}
+
+{% block title %}Online Store{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <h1 class="display-4">Our Products</h1>
+    </div>
+    <div class="col-auto">
+        <a href="{% url 'cart_view' %}" class="btn btn-warning btn-lg">
+            Cart <span class="badge bg-dark">{{ request.session.online_cart|length }}</span>
+        </a>
+    </div>
+</div>
+
+<div class="row row-cols-1 row-cols-md-3 g-4">
+    {% for product in products %}
+    <div class="col">
+        <div class="card h-100">
+            {% if product.image %}
+                <img src="{{ product.image.url }}" class="card-img-top" alt="{{ product.name }}" style="height: 200px; object-fit: cover;">
+            {% else %}
+                <div class="bg-secondary text-white d-flex align-items-center justify-content-center" style="height: 200px;">
+                    No Image
+                </div>
+            {% endif %}
+            <div class="card-body">
+                <h5 class="card-title">{{ product.name }}</h5>
+                <p class="card-text text-muted">{{ product.description|truncatewords:20 }}</p>
+                <h4 class="card-text">${{ product.price }}</h4>
+                <p class="card-text">
+                    {% if product.stock_quantity > 0 %}
+                        <span class="badge bg-success">In Stock</span>
+                    {% else %}
+                        <span class="badge bg-danger">Out of Stock</span>
+                    {% endif %}
+                </p>
+            </div>
+            <div class="card-footer bg-transparent border-top-0">
+                <a href="{% url 'product_detail' product.id %}" class="btn btn-outline-primary w-100">View Details</a>
+            </div>
+        </div>
+    </div>
+    {% empty %}
+    <div class="col-12">
+        <div class="alert alert-info">No products available.</div>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}
